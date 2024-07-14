@@ -72,6 +72,8 @@ contract Staking is Ownable, ReentrancyGuard {
     }
 
     function rewardPerToken(uint256 poolId) public view returns (uint256) {
+        console.log("totalSupply: ", totalSupply);
+        console.log("rewardRate: ", rewardRate);
         if (totalSupply == 0) {
             return rewardPerTokenStored;
         }
