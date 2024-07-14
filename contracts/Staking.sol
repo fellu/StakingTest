@@ -36,7 +36,7 @@ contract Staking is Ownable, ReentrancyGuard {
     PoolInfo[] public pools;
     mapping(address => mapping(uint256 => StakeInfo)) public userStakes;
 
-    uint256[] public totalSupplyPerPool;
+    uint256 public totalSupply;
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
     mapping(address => uint256) private _balances;
@@ -55,16 +55,12 @@ contract Staking is Ownable, ReentrancyGuard {
         pools.push(PoolInfo(90 days, 0.5 * 1e18)); // 90 days, 0.5x multiplier
         pools.push(PoolInfo(180 days, 1 * 1e18)); // 180 days, 1x multiplier
         pools.push(PoolInfo(360 days, 1.5 * 1e18)); // 360 days, 1.5x multiplier
-
-        totalSupplyPerPool.push(0);
-        totalSupplyPerPool.push(0);
-        totalSupplyPerPool.push(0);
     }
 
     /* ========== VIEWS ========== */
 
-    function totalSupply(uint256 poolId) public view returns (uint256) {
-        return totalSupplyPerPool[poolId];
+    function totalSupplyAllPools() public view returns (uint256) {
+        return totalSupply;
     }
 
     function balanceOf(address account, uint256 poolId) public view returns (uint256) {
@@ -76,12 +72,12 @@ contract Staking is Ownable, ReentrancyGuard {
     }
 
     function rewardPerToken(uint256 poolId) public view returns (uint256) {
-        if (totalSupplyPerPool[poolId] == 0) {
+        if (totalSupply == 0) {
             return rewardPerTokenStored;
         }
         return
             rewardPerTokenStored.add(
-            lastTimeRewardApplicable().sub(lastUpdateTime).mul(rewardRate).mul(pools[poolId].multiplier).div(totalSupplyPerPool[poolId])
+            lastTimeRewardApplicable().sub(lastUpdateTime).mul(rewardRate).mul(pools[poolId].multiplier).div(totalSupply)
         );
     }
 
@@ -95,7 +91,7 @@ contract Staking is Ownable, ReentrancyGuard {
         require(amount > 0, "Cannot stake 0");
         require(poolId < pools.length, "Invalid poolId");
 
-        totalSupplyPerPool[poolId] = totalSupplyPerPool[poolId].add(amount);
+        totalSupply = totalSupply.add(amount);
         _balances[msg.sender] = _balances[msg.sender].add(amount);
         stakingToken.transferFrom(msg.sender, address(this), amount);
 
@@ -116,9 +112,13 @@ contract Staking is Ownable, ReentrancyGuard {
         uint256 amount = stakeInfo.amount;
         uint256 reward = stakeInfo.rewards;
 
-        totalSupplyPerPool[poolId] = totalSupplyPerPool[poolId].sub(amount);
+        totalSupply = totalSupply.sub(amount);
         _balances[msg.sender] = _balances[msg.sender].sub(amount);
 
+        console.log("user: ", msg.sender);
+        console.log("pool: ", poolId);
+        console.log("amount: ", amount);
+        console.log("reward: ", reward);
         stakingToken.transfer(msg.sender, amount);
         if (reward > 0) {
             stakeInfo.rewards = 0;
@@ -182,7 +182,6 @@ contract Staking is Ownable, ReentrancyGuard {
 
     function addPool(uint256 lockupDuration, uint256 multiplier) external onlyOwner {
         pools.push(PoolInfo(lockupDuration, multiplier));
-        totalSupplyPerPool.push(0);
     }
 
     function setRewardsDuration(uint256 _rewardsDuration) external onlyOwner {
@@ -191,11 +190,7 @@ contract Staking is Ownable, ReentrancyGuard {
     }
 
     function totalStaked() public view returns (uint256) {
-        uint256 total = 0;
-        for (uint256 i = 0; i < totalSupplyPerPool.length; i++) {
-            total = total.add(totalSupplyPerPool[i]);
-        }
-        return total;
+        return totalSupply;
     }
 
     /* ========== MODIFIERS ========== */
@@ -218,3 +213,4 @@ contract Staking is Ownable, ReentrancyGuard {
     event Withdrawn(address indexed user, uint256 amount, uint256 poolId);
     event RewardPaid(address indexed user, uint256 reward);
 }
+
