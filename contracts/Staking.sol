@@ -88,8 +88,26 @@ contract Staking is Ownable, ReentrancyGuard {
     }
 
     function earned(address account, uint256 poolId) public view returns (uint256) {
-        return userStakes[account][poolId].amount.mul(
-            rewardPerToken().mul(pools[poolId].multiplier).sub(userStakes[account][poolId].rewardPerTokenPaid)).div(1e19).add(userStakes[account][poolId].rewards);
+        StakeInfo storage stakeInfo = userStakes[account][poolId];
+
+        uint256 earnedRewards = stakeInfo.amount
+            .mul(rewardPerToken()
+            .sub(stakeInfo.rewardPerTokenPaid))
+            .div(1e18)
+            .add(stakeInfo.rewards)
+            .div(1e1)
+            .mul(pools[poolId].multiplier);
+        console.log("earned called for account:", account);
+        console.log("poolId:", poolId);
+        console.log("stakeInfo.amount:", stakeInfo.amount);
+        console.log("stakeInfo.amount:", stakeInfo.amount.div(1e18));
+        console.log("rewardPerToken:", rewardPerToken());
+        console.log("pool multiplier:", pools[poolId].multiplier);
+        console.log("stakeInfo.rewardPerTokenPaid:", stakeInfo.rewardPerTokenPaid);
+        console.log("stakeInfo.rewardPerTokenPaid:", stakeInfo.rewardPerTokenPaid.div(1e18));
+        console.log("calculated earnedRewards:", earnedRewards);
+        console.log("calculated earnedRewards:", earnedRewards.div(1e18));
+        return earnedRewards;
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
@@ -106,7 +124,7 @@ contract Staking is Ownable, ReentrancyGuard {
         stakeInfo.amount = stakeInfo.amount.add(amount);
         stakeInfo.startTime = block.timestamp;
         stakeInfo.endTime = block.timestamp.add(pools[poolId].lockupDuration);
-        stakeInfo.rewardPerTokenPaid = rewardPerToken(); // Store current rewardPerToken
+        stakeInfo.rewardPerTokenPaid = rewardPerToken();
 
         emit Staked(msg.sender, amount, poolId);
     }
@@ -164,9 +182,7 @@ contract Staking is Ownable, ReentrancyGuard {
             uint256 leftover = remaining.mul(rewardRate);
             rewardRate = reward.add(leftover).div(rewardsDuration);
             console.log("NOT finished per rewardRate: ", rewardRate);
-
         }
-
 
         uint256 highestMultiplier = 0;
         for (uint256 i = 0; i < pools.length; i++) {
@@ -175,7 +191,6 @@ contract Staking is Ownable, ReentrancyGuard {
             }
         }
 
-        // Corrected logic to ensure balance covers reward distribution
         uint256 balance = rewardsToken.balanceOf(address(this)).sub(totalStaked());
         uint256 requiredBalance = rewardRate.mul(highestMultiplier).mul(rewardsDuration).div(1e1);
         console.log("requiredBalance: ", requiredBalance);
@@ -190,7 +205,6 @@ contract Staking is Ownable, ReentrancyGuard {
         console.log("Balance:", balance);
         console.log("Rewards Duration:", rewardsDuration);
         console.log("Required Balance:", requiredBalance);
-
 
         lastUpdateTime = block.timestamp;
         periodFinish = block.timestamp.add(rewardsDuration);
@@ -215,6 +229,9 @@ contract Staking is Ownable, ReentrancyGuard {
     modifier updateReward(address account, uint256 poolId) {
         rewardPerTokenStored = rewardPerToken();
         lastUpdateTime = lastTimeRewardApplicable();
+        console.log("Updating rewards:");
+        console.log("rewardPerTokenStored:", rewardPerTokenStored);
+        console.log("lastUpdateTime:", lastUpdateTime);
         if (account != address(0)) {
             StakeInfo storage stakeInfo = userStakes[account][poolId];
             stakeInfo.rewards = earned(account, poolId);
