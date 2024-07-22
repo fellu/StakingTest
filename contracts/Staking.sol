@@ -158,6 +158,7 @@ contract Staking is Ownable, ReentrancyGuard {
         if (block.timestamp >= periodFinish) {
             rewardRate = reward.div(rewardsDuration);
             console.log("finished per rewardRate: ", rewardRate);
+            console.log("finished per rewardsDuration: ", rewardsDuration);
         } else {
             uint256 remaining = periodFinish.sub(block.timestamp);
             uint256 leftover = remaining.mul(rewardRate);
@@ -176,7 +177,11 @@ contract Staking is Ownable, ReentrancyGuard {
 
         // Corrected logic to ensure balance covers reward distribution
         uint256 balance = rewardsToken.balanceOf(address(this)).sub(totalStaked());
-        uint256 requiredBalance = rewardRate.mul(highestMultiplier).mul(rewardsDuration).div(1e18);
+        uint256 requiredBalance = rewardRate.mul(highestMultiplier).mul(rewardsDuration).div(1e1);
+        console.log("requiredBalance: ", requiredBalance);
+        console.log("requiredBalance: ", requiredBalance.div(1e18));
+        console.log("hadBalance: ", balance);
+        console.log("hadBalance: ", balance.div(1e18));
         require(requiredBalance <= balance, "Provided reward too high");
 
         // Logging intermediate values
