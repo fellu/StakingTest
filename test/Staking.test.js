@@ -6,7 +6,7 @@ describe("Advanced Staking Contract Tests", function () {
     const rewardDuration = 60 * 60 * 24 * 30; // 30 days
 
     beforeEach(async function () {
-        [owner, addr1, addr2] = await ethers.getSigners();
+        [owner, addr1, addr2, addr3] = await ethers.getSigners();
 
         // Deploy a mock ERC20 token for rewards
         const ERC20Mock = await ethers.getContractFactory("ERC20Mock");
@@ -25,10 +25,12 @@ describe("Advanced Staking Contract Tests", function () {
         // Transfer some tokens to addr1 and addr2
         await stakingToken.transfer(addr1.getAddress(), ethers.parseEther("1000"));
         await stakingToken.transfer(addr2.getAddress(), ethers.parseEther("1000"));
+        await stakingToken.transfer(addr3.getAddress(), ethers.parseEther("1000"));
 
         // Approve the staking contract to spend tokens on behalf of addr1 and addr2
         await stakingToken.connect(addr1).approve(staking.target, ethers.parseEther("1000"));
         await stakingToken.connect(addr2).approve(staking.target, ethers.parseEther("1000"));
+        await stakingToken.connect(addr3).approve(staking.target, ethers.parseEther("1000"));
 
         // Transfer some rewards to the staking contract
         await rewardsToken.transfer(staking.target, ethers.parseEther("10000"));
@@ -99,6 +101,26 @@ describe("Advanced Staking Contract Tests", function () {
             console.log("\nTESTS :: reward after third before withdraw (addr1): " + rewardAfterSecond_1 + " (" +parseFloat(ethers.formatEther(rewardAfterSecond_1.toString()))+ ")")
             console.log("TESTS :: reward after third before withdraw (addr2): " + rewardAfterSecond_2 + " (" +parseFloat(ethers.formatEther(rewardAfterSecond_2.toString()))+ ")")
 
+
+            await staking.connect(addr3).stake(amount100, 0);
+
+            console.log("\n TESTS :: Add new rewards")
+            await staking.notifyRewardAmount(amount100);
+
+            // Simulate the passage of time to accrue rewards
+            await ethers.provider.send("evm_increaseTime", [rewardDuration]);
+            await ethers.provider.send("evm_mine");
+
+            console.log("\n TESTS :: staking.earned 1")
+            const rewardAfterSecond_1_2 = await staking.earned(addr1.getAddress(), 1);
+            console.log("\n TESTS :: staking.earned 2")
+            const rewardAfterSecond_2_2 = await staking.earned(addr2.getAddress(), 1);
+            console.log("\n TESTS :: staking.earned 3")
+            const rewardAfterSecond_3_2 = await staking.earned(addr3.getAddress(), 0);
+
+            console.log("\nTESTS :: reward after third before withdraw (addr1): " + rewardAfterSecond_1_2 + " (" +parseFloat(ethers.formatEther(rewardAfterSecond_1_2.toString()))+ ")")
+            console.log("TESTS :: reward after third before withdraw (addr2): " + rewardAfterSecond_2_2 + " (" +parseFloat(ethers.formatEther(rewardAfterSecond_2_2.toString()))+ ")")
+            console.log("TESTS :: reward after third before withdraw (addr3): " + rewardAfterSecond_3_2 + " (" +parseFloat(ethers.formatEther(rewardAfterSecond_3_2.toString()))+ ")")
 
 
             const balance = await stakingToken.balanceOf(addr1.getAddress());
