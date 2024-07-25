@@ -75,25 +75,25 @@ contract Staking is Ownable, ReentrancyGuard {
         return userStakes[account][poolId].amount;
     }
 
-    function totalStakedByUser(address account) public view returns (uint256) {
-        uint256 totalStaked = 0;
+    function balanceOf(address account) public view returns (uint256) {
+        uint256 totalUserStaked = 0;
         for (uint256 i = 0; i < pools.length; i++) {
             if (i == 3) {
                 uint256 campaignStake = userStakes[account][i].amount;
                 if (campaignStake >= 500_000 * 10**18 && campaignStake < 1_000_000 * 10**18) {
-                    totalStaked = totalStaked.add(1_000_000 * 10**18);
+                    totalUserStaked = totalUserStaked.add(1_000_000 * 10**18);
                 } else if (campaignStake >= 2_000_000 * 10**18 && campaignStake < 3_000_000 * 10**18) {
-                    totalStaked = totalStaked.add(3_000_000 * 10**18);
+                    totalUserStaked = totalUserStaked.add(3_000_000 * 10**18);
                 } else if (campaignStake >= 7_500_000 * 10**18 && campaignStake < 10_000_000 * 10**18) {
-                    totalStaked = totalStaked.add(10_000_000 * 10**18);
+                    totalUserStaked = totalUserStaked.add(10_000_000 * 10**18);
                 } else {
-                    totalStaked = totalStaked.add(campaignStake);
+                    totalUserStaked = totalUserStaked.add(campaignStake);
                 }
             } else {
-                totalStaked = totalStaked.add(userStakes[account][i].amount);
+                totalUserStaked = totalUserStaked.add(userStakes[account][i].amount);
             }
         }
-        return totalStaked;
+        return totalUserStaked;
     }
 
 
@@ -316,8 +316,22 @@ contract Staking is Ownable, ReentrancyGuard {
         emit RewardAdded(reward);
     }
 
-    function addPool(uint256 lockupDuration, uint256 multiplier) external onlyOwner {
-        pools.push(PoolInfo(lockupDuration, multiplier));
+    function addPool(
+        uint256 lockupDuration,
+        uint256 multiplier,
+        uint256 penaltyAmount,
+        bool withdrawWithPenalty,
+        bool active,
+        bool requireMinimumStake
+    ) external onlyOwner {
+        pools.push(PoolInfo({
+            lockupDuration: lockupDuration,
+            multiplier: multiplier,
+            penaltyAmount: penaltyAmount,
+            withdrawWithPenalty: withdrawWithPenalty,
+            active: active,
+            requireMinimumStake: requireMinimumStake
+        }));
     }
 
     function setRewardsDuration(uint256 _rewardsDuration) external onlyOwner {
