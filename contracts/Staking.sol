@@ -27,6 +27,8 @@ contract Staking is Ownable, ReentrancyGuard {
         uint256 multiplier;
         uint256 penaltyAmount;
         bool withdrawWithPenalty;
+        bool active;
+        bool requireMinimumStake;
     }
 
     struct StakeInfo {
@@ -58,10 +60,10 @@ contract Staking is Ownable, ReentrancyGuard {
         minimumStakeAmount = 1_000_000 * 10**18;
         feeAddress = _feeAddress;
 
-        pools.push(PoolInfo(90 days, 0.5 * 1e1, 30, true)); // 90 days, 0.5x multiplier
-        pools.push(PoolInfo(180 days, 1 * 1e1, 30, true)); // 180 days, 1x multiplier
-        pools.push(PoolInfo(360 days, 1.5 * 1e1, 30, true)); // 360 days, 1.5x multiplier
-        pools.push(PoolInfo(360 days, 2 * 1e1, 100, false)); // 360 days, 2 multiplier, cannot withdraw even with penalty
+        pools.push(PoolInfo(90 days, 0.5 * 1e1, 30, true, true, true)); // 90 days, 0.5x multiplier
+        pools.push(PoolInfo(180 days, 1 * 1e1, 30, true, true, true)); // 180 days, 1x multiplier
+        pools.push(PoolInfo(360 days, 1.5 * 1e1, 30, true, true, true)); // 360 days, 1.5x multiplier
+        pools.push(PoolInfo(360 days, 2 * 1e1, 100, false, true, false)); // 360 days, 2 multiplier, cannot withdraw even with penalty
     }
 
     /* ========== VIEWS ========== */
@@ -96,9 +98,10 @@ contract Staking is Ownable, ReentrancyGuard {
 
     function earned(address account, uint256 poolId) public view returns (uint256) {
         StakeInfo storage stakeInfo = userStakes[account][poolId];
+        PoolInfo storage poolInfo = pools[poolId];
 
         // Check if the staked amount meets the minimum requirement
-        if (stakeInfo.amount < minimumStakeAmount) {
+        if (poolInfo.requireMinimumStake && stakeInfo.amount < minimumStakeAmount) {
             return 0;
         }
 
@@ -108,13 +111,13 @@ contract Staking is Ownable, ReentrancyGuard {
             .div(1e18)
             .add(stakeInfo.rewards)
             .div(1e1)
-            .mul(pools[poolId].multiplier);
+            .mul(poolInfo.multiplier);
         console.log("earned called for account:", account);
         console.log("poolId:", poolId);
         console.log("stakeInfo.amount:", stakeInfo.amount);
         console.log("stakeInfo.amount:", stakeInfo.amount.div(1e18));
         console.log("rewardPerToken:", rewardPerToken());
-        console.log("pool multiplier:", pools[poolId].multiplier);
+        console.log("pool multiplier:", poolInfo.multiplier);
         console.log("stakeInfo.rewardPerTokenPaid:", stakeInfo.rewardPerTokenPaid);
         console.log("stakeInfo.rewardPerTokenPaid:", stakeInfo.rewardPerTokenPaid.div(1e18));
         console.log("calculated earnedRewards:", earnedRewards);
@@ -220,6 +223,26 @@ contract Staking is Ownable, ReentrancyGuard {
 
 
     /* ========== RESTRICTED FUNCTIONS ========== */
+    function editPool(
+        uint256 poolId,
+        uint256 lockupDuration,
+        uint256 multiplier,
+        uint256 penaltyAmount,
+        bool withdrawWithPenalty,
+        bool active,
+        bool requireMinimumStake
+    ) external onlyOwner {
+        require(poolId < pools.length, "Invalid poolId");
+
+        PoolInfo storage pool = pools[poolId];
+        pool.lockupDuration = lockupDuration;
+        pool.multiplier = multiplier;
+        pool.penaltyAmount = penaltyAmount;
+        pool.withdrawWithPenalty = withdrawWithPenalty;
+        pool.active = active;
+        pool.requireMinimumStake = requireMinimumStake;
+    }
+
     function setMinimumStakeAmount(uint256 _minimumStakeAmount) external onlyOwner {
         minimumStakeAmount = _minimumStakeAmount;
     }
