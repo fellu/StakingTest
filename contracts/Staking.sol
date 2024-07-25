@@ -75,6 +75,28 @@ contract Staking is Ownable, ReentrancyGuard {
         return userStakes[account][poolId].amount;
     }
 
+    function totalStakedByUser(address account) public view returns (uint256) {
+        uint256 totalStaked = 0;
+        for (uint256 i = 0; i < pools.length; i++) {
+            if (i == 3) {
+                uint256 campaignStake = userStakes[account][i].amount;
+                if (campaignStake >= 500_000 * 10**18 && campaignStake < 1_000_000 * 10**18) {
+                    totalStaked = totalStaked.add(1_000_000 * 10**18);
+                } else if (campaignStake >= 2_000_000 * 10**18 && campaignStake < 3_000_000 * 10**18) {
+                    totalStaked = totalStaked.add(3_000_000 * 10**18);
+                } else if (campaignStake >= 7_500_000 * 10**18 && campaignStake < 10_000_000 * 10**18) {
+                    totalStaked = totalStaked.add(10_000_000 * 10**18);
+                } else {
+                    totalStaked = totalStaked.add(campaignStake);
+                }
+            } else {
+                totalStaked = totalStaked.add(userStakes[account][i].amount);
+            }
+        }
+        return totalStaked;
+    }
+
+
     function lastTimeRewardApplicable() public view returns (uint256) {
         return Math.min(block.timestamp, periodFinish);
     }
