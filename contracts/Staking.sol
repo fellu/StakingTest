@@ -132,6 +132,10 @@ contract Staking is Ownable, ReentrancyGuard {
         require(amount > 0, "Cannot stake 0");
         require(poolId < pools.length, "Invalid poolId");
 
+        PoolInfo storage poolInfo = pools[poolId];
+
+        require(poolInfo.active, "Pool is not active");
+
         totalSupply = totalSupply.add(amount);
         _balances[msg.sender] = _balances[msg.sender].add(amount);
         stakingToken.transferFrom(msg.sender, address(this), amount);
@@ -139,7 +143,7 @@ contract Staking is Ownable, ReentrancyGuard {
         StakeInfo storage stakeInfo = userStakes[msg.sender][poolId];
         stakeInfo.amount = stakeInfo.amount.add(amount);
         stakeInfo.startTime = block.timestamp;
-        stakeInfo.endTime = block.timestamp.add(pools[poolId].lockupDuration);
+        stakeInfo.endTime = block.timestamp.add(poolInfo.lockupDuration);
         stakeInfo.rewardPerTokenPaid = rewardPerToken();
 
         emit Staked(msg.sender, amount, poolId);
