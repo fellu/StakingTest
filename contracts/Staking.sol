@@ -56,7 +56,7 @@ contract Staking is Ownable, ReentrancyGuard {
         stakingToken = IERC20(_stakingToken);
         rewardsToken = IERC20(_rewardsToken);
         rewardsDuration = _rewardsDuration;
-        minimumStakeAmount = 1_000_000 * 10**18;
+        minimumStakeAmount = 999_999 * 10**18;
         feeAddress = _feeAddress;
 
         pools.push(PoolInfo(90 days, 0.5 * 1e1, 30, true, true, true)); // 90 days, 0.5x multiplier
@@ -181,7 +181,7 @@ contract Staking is Ownable, ReentrancyGuard {
         if (block.timestamp < stakeInfo.endTime) {
             PoolInfo storage poolInfo = pools[poolId];
 
-            if (poolInfo.withdrawWithPenalty) {
+            if (poolInfo.withdrawWithPenalty && poolInfo.penaltyAmount > 0) {
                 penalty = amount.mul(poolInfo.penaltyAmount).div(100);
                 amount = amount.sub(penalty);
             }
