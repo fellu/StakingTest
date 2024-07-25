@@ -43,7 +43,6 @@ contract Staking is Ownable, ReentrancyGuard {
     mapping(address => mapping(uint256 => StakeInfo)) public userStakes;
 
     uint256 public totalSupply;
-    mapping(address => uint256) public rewards;
     mapping(address => uint256) private _balances;
 
     /* ========== CONSTRUCTOR ========== */
@@ -63,7 +62,7 @@ contract Staking is Ownable, ReentrancyGuard {
         pools.push(PoolInfo(90 days, 0.5 * 1e1, 30, true, true, true)); // 90 days, 0.5x multiplier
         pools.push(PoolInfo(180 days, 1 * 1e1, 30, true, true, true)); // 180 days, 1x multiplier
         pools.push(PoolInfo(360 days, 1.5 * 1e1, 30, true, true, true)); // 360 days, 1.5x multiplier
-        pools.push(PoolInfo(360 days, 2 * 1e1, 100, false, true, false)); // 360 days, 2 multiplier, cannot withdraw even with penalty
+        pools.push(PoolInfo(360 days, 1.5 * 1e1, 100, false, true, false)); // 360 days, 1.5x multiplier, cannot withdraw even with penalty
     }
 
     /* ========== VIEWS ========== */
