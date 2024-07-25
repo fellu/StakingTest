@@ -19,10 +19,14 @@ contract Staking is Ownable, ReentrancyGuard {
     uint256 public rewardRate;
     uint256 public lastUpdateTime;
     uint256 public rewardPerTokenStored;
+    uint256 public minimumStakeAmount;
+    address public feeAddress;
 
     struct PoolInfo {
         uint256 lockupDuration;
         uint256 multiplier;
+        uint256 penaltyAmount;
+        bool withdrawWithPenalty;
     }
 
     struct StakeInfo {
@@ -37,7 +41,6 @@ contract Staking is Ownable, ReentrancyGuard {
     mapping(address => mapping(uint256 => StakeInfo)) public userStakes;
 
     uint256 public totalSupply;
-    mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
     mapping(address => uint256) private _balances;
 
@@ -46,15 +49,19 @@ contract Staking is Ownable, ReentrancyGuard {
     constructor(
         address _stakingToken,
         address _rewardsToken,
-        uint256 _rewardsDuration
+        uint256 _rewardsDuration,
+        address _feeAddress
     ) {
         stakingToken = IERC20(_stakingToken);
         rewardsToken = IERC20(_rewardsToken);
         rewardsDuration = _rewardsDuration;
+        minimumStakeAmount = 1_000_000 * 10**18;
+        feeAddress = _feeAddress;
 
-        pools.push(PoolInfo(90 days, 0.5 * 1e1)); // 90 days, 0.5x multiplier
-        pools.push(PoolInfo(180 days, 1 * 1e1)); // 180 days, 1x multiplier
-        pools.push(PoolInfo(360 days, 1.5 * 1e1)); // 360 days, 1.5x multiplier
+        pools.push(PoolInfo(90 days, 0.5 * 1e1, 30, true)); // 90 days, 0.5x multiplier
+        pools.push(PoolInfo(180 days, 1 * 1e1, 30, true)); // 180 days, 1x multiplier
+        pools.push(PoolInfo(360 days, 1.5 * 1e1, 30, true)); // 360 days, 1.5x multiplier
+        pools.push(PoolInfo(360 days, 2 * 1e1, 100, false)); // 360 days, 2 multiplier, cannot withdraw even with penalty
     }
 
     /* ========== VIEWS ========== */
@@ -90,6 +97,11 @@ contract Staking is Ownable, ReentrancyGuard {
     function earned(address account, uint256 poolId) public view returns (uint256) {
         StakeInfo storage stakeInfo = userStakes[account][poolId];
 
+        // Check if the staked amount meets the minimum requirement
+        if (stakeInfo.amount < minimumStakeAmount) {
+            return 0;
+        }
+
         uint256 earnedRewards = stakeInfo.amount
             .mul(rewardPerToken()
             .sub(stakeInfo.rewardPerTokenPaid))
@@ -107,6 +119,7 @@ contract Staking is Ownable, ReentrancyGuard {
         console.log("stakeInfo.rewardPerTokenPaid:", stakeInfo.rewardPerTokenPaid.div(1e18));
         console.log("calculated earnedRewards:", earnedRewards);
         console.log("calculated earnedRewards:", earnedRewards.div(1e18));
+
         return earnedRewards;
     }
 
@@ -132,19 +145,39 @@ contract Staking is Ownable, ReentrancyGuard {
     function withdraw(uint256 poolId) public nonReentrant updateReward(msg.sender, poolId) {
         StakeInfo storage stakeInfo = userStakes[msg.sender][poolId];
         require(stakeInfo.amount > 0, "Cannot withdraw 0");
-        require(block.timestamp >= stakeInfo.endTime, "Lock period not ended");
 
         uint256 amount = stakeInfo.amount;
+        uint256 penalty = 0;
+
+        // Apply a penalty if withdrawing before lock period ends, or do not allow to withdraw at all
+        if (block.timestamp < stakeInfo.endTime) {
+            PoolInfo storage poolInfo = pools[poolId];
+
+            if (poolInfo.withdrawWithPenalty) {
+                penalty = amount.mul(poolInfo.penaltyAmount).div(100);
+                amount = amount.sub(penalty);
+            }
+            else {
+                require(block.timestamp >= stakeInfo.endTime, "Lock period not ended");
+            }
+        }
+
+
         uint256 reward = stakeInfo.rewards;
 
-        totalSupply = totalSupply.sub(amount);
-        _balances[msg.sender] = _balances[msg.sender].sub(amount);
+        totalSupply = totalSupply.sub(stakeInfo.amount);
+        _balances[msg.sender] = _balances[msg.sender].sub(stakeInfo.amount);
 
         console.log("user: ", msg.sender);
         console.log("pool: ", poolId);
         console.log("amount: ", amount);
         console.log("reward: ", reward);
         stakingToken.transfer(msg.sender, amount);
+
+        if (penalty > 0) {
+            stakingToken.transfer(feeAddress, penalty);
+        }
+
         if (reward > 0) {
             stakeInfo.rewards = 0;
             rewardsToken.transfer(msg.sender, reward);
@@ -165,11 +198,35 @@ contract Staking is Ownable, ReentrancyGuard {
         }
     }
 
-    function exit(uint256 poolId) external {
-        withdraw(poolId);
+    function claimAllRewards() public nonReentrant {
+        for (uint256 i = 0; i < pools.length; i++) {
+            // Manually update rewards for each pool, not using the updateReward modifier here
+            rewardPerTokenStored = rewardPerToken();
+            lastUpdateTime = lastTimeRewardApplicable();
+
+            StakeInfo storage stakeInfo = userStakes[msg.sender][i];
+            stakeInfo.rewards = earned(msg.sender, i);
+            stakeInfo.rewardPerTokenPaid = rewardPerTokenStored;
+
+            // Transfer rewards if any
+            uint256 reward = stakeInfo.rewards;
+            if (reward > 0) {
+                stakeInfo.rewards = 0;
+                rewardsToken.transfer(msg.sender, reward);
+                emit RewardPaid(msg.sender, reward);
+            }
+        }
     }
 
+
     /* ========== RESTRICTED FUNCTIONS ========== */
+    function setMinimumStakeAmount(uint256 _minimumStakeAmount) external onlyOwner {
+        minimumStakeAmount = _minimumStakeAmount;
+    }
+
+    function emergencyWithdraw(address tokenAddress, uint256 amount) external onlyOwner {
+        IERC20(tokenAddress).transfer(msg.sender, amount);
+    }
 
     function notifyRewardAmount(uint256 reward) external onlyOwner updateReward(address(0), 0) {
         console.log("Added reward: ", reward);
