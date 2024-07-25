@@ -35,7 +35,7 @@ contract Staking is Ownable, ReentrancyGuard {
         uint256 amount;
         uint256 startTime;
         uint256 endTime;
-        uint256 rewardPerTokenPaid; // Tracks user's share of rewardPerToken at the time of staking
+        uint256 rewardPerTokenPaid;
         uint256 rewards;
     }
 
@@ -169,6 +169,28 @@ contract Staking is Ownable, ReentrancyGuard {
 
         emit Staked(msg.sender, amount, poolId);
     }
+
+    function stakeFor(uint256 amount, uint256 poolId, address stakeFor) external nonReentrant updateReward(msg.sender, poolId) {
+        require(amount > 0, "Cannot stake 0");
+        require(poolId < pools.length, "Invalid poolId");
+
+        PoolInfo storage poolInfo = pools[poolId];
+
+        require(poolInfo.active, "Pool is not active");
+
+        totalSupply = totalSupply.add(amount);
+        stakingToken.transferFrom(msg.sender, address(this), amount);
+        _balances[stakeFor] = _balances[stakeFor].add(amount);
+
+        StakeInfo storage stakeInfo = userStakes[stakeFor][poolId];
+        stakeInfo.amount = stakeInfo.amount.add(amount);
+        stakeInfo.startTime = block.timestamp;
+        stakeInfo.endTime = block.timestamp.add(poolInfo.lockupDuration);
+        stakeInfo.rewardPerTokenPaid = rewardPerToken();
+
+        emit Staked(stakeFor, amount, poolId);
+    }
+
 
     function withdraw(uint256 poolId) public nonReentrant updateReward(msg.sender, poolId) {
         StakeInfo storage stakeInfo = userStakes[msg.sender][poolId];
