@@ -170,28 +170,6 @@ contract Staking is Ownable, ReentrancyGuard {
         emit Staked(msg.sender, amount, poolId);
     }
 
-    function stakeFor(uint256 amount, uint256 poolId, address stakeFor) external nonReentrant updateReward(msg.sender, poolId) {
-        require(amount > 0, "Cannot stake 0");
-        require(poolId < pools.length, "Invalid poolId");
-
-        PoolInfo storage poolInfo = pools[poolId];
-
-        require(poolInfo.active, "Pool is not active");
-
-        totalSupply = totalSupply.add(amount);
-        stakingToken.transferFrom(msg.sender, address(this), amount);
-        _balances[stakeFor] = _balances[stakeFor].add(amount);
-
-        StakeInfo storage stakeInfo = userStakes[stakeFor][poolId];
-        stakeInfo.amount = stakeInfo.amount.add(amount);
-        stakeInfo.startTime = block.timestamp;
-        stakeInfo.endTime = block.timestamp.add(poolInfo.lockupDuration);
-        stakeInfo.rewardPerTokenPaid = rewardPerToken();
-
-        emit Staked(stakeFor, amount, poolId);
-    }
-
-
     function withdraw(uint256 poolId) public nonReentrant updateReward(msg.sender, poolId) {
         StakeInfo storage stakeInfo = userStakes[msg.sender][poolId];
         require(stakeInfo.amount > 0, "Cannot withdraw 0");
@@ -270,6 +248,27 @@ contract Staking is Ownable, ReentrancyGuard {
 
 
     /* ========== RESTRICTED FUNCTIONS ========== */
+    function stakeFor(uint256 amount, uint256 poolId, address stakeForAddress) external onlyOwner nonReentrant updateReward(stakeForAddress, poolId) {
+        require(amount > 0, "Cannot stake 0");
+        require(poolId < pools.length, "Invalid poolId");
+
+        PoolInfo storage poolInfo = pools[poolId];
+
+        require(poolInfo.active, "Pool is not active");
+
+        totalSupply = totalSupply.add(amount);
+        stakingToken.transferFrom(msg.sender, address(this), amount);
+        _balances[stakeForAddress] = _balances[stakeForAddress].add(amount);
+
+        StakeInfo storage stakeInfo = userStakes[stakeForAddress][poolId];
+        stakeInfo.amount = stakeInfo.amount.add(amount);
+        stakeInfo.startTime = block.timestamp;
+        stakeInfo.endTime = block.timestamp.add(poolInfo.lockupDuration);
+        stakeInfo.rewardPerTokenPaid = rewardPerToken();
+
+        emit Staked(stakeForAddress, amount, poolId);
+    }
+
     function editPool(
         uint256 poolId,
         uint256 lockupDuration,
